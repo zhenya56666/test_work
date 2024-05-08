@@ -33,7 +33,7 @@ def dict_to_fill(request): #функция создает словарь кот�
     while date_from <= date_to:
         if group == 'month':
             date_from = datetime(date_from.year, date_from.month, 1, date_from.hour, date_from.minute, date_from.second) #меняем дату на начало месяца
-            result[date_from] = []
+            result[date_from] = 0
 
             new_month = date_from.month + 1 #Определяем новый месяц и год если требуется
             new_year = date_from.year
@@ -44,11 +44,11 @@ def dict_to_fill(request): #функция создает словарь кот�
 
         elif group == 'year':
             date_from = datetime(date_from.year, 1, 1, date_from.hour, date_from.minute, date_from.second)
-            result[date_from] = []
+            result[date_from] = 0
             new_year = date_from.year + 1
             date_from = datetime(new_year, 1, 1, date_from.hour, date_from.minute, date_from.second)
         else:
-            result[date_from] = []
+            result[date_from] = 0
             date_from = date_from + options[group]
 
     return result
@@ -86,7 +86,17 @@ def response(database_name, collection_name): #функция формирова
                     raw_data[it] += int(data['value'])
     client.close()
 
-    return raw_data
+    #формирование ответа
+    dataset = []
+    for it in raw_data:
+        dataset.append(raw_data[it])
+
+    result = {'dataset': [], 'labels': []}
+    for it in raw_data.keys():
+        result['labels'].append(datetime.strftime(it, '%Y-%m-%dT%H:%M:%S'))
+    result['dataset'] = dataset.copy()
+
+    return result
 
 
 if __name__ == '__main__':
