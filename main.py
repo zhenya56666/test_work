@@ -53,6 +53,41 @@ def dict_to_fill(request): #функция создает словарь кот�
 
     return result
 
+def response(database_name, collection_name): #функция формирования ответа
+    with open('request.json', 'r') as request_json: #временная затычка для запросов
+        request = json.load(request_json)
+        request['dt_from'] = datetime.strptime(request['dt_from'], '%Y-%m-%dT%H:%M:%S')
+        request['dt_upto'] = datetime.strptime(request['dt_upto'], '%Y-%m-%dT%H:%M:%S')
+    request_json.close()
+    raw_data = dict_to_fill(request)
+
+    client = pymongo.MongoClient("mongodb://localhost:27017/")  # подключение к mongodb
+    database = client[database_name]
+    collection = database[collection_name]
+
+    date_from = request['dt_from']
+    date_to = request['dt_upto']
+    group = request['group_type']
+    request_tobd = {"dt": {"$gte": date_from, "$lte": date_to}}
+    cursor_bd = collection.find(request_tobd)
+
+    # заполняем данные
+    for data in cursor_bd:  # цикл прохождения по выданным данным из бд
+        if date_from <= data['dt'] <= date_to:  # дополнительная проверка, коректные ли данные пришли из бд
+            for it in raw_data:  # цикл для определения куда именно положить данные
+                options = {  # опции сравнения в зависимости от указанной группы агригации данных
+                    'year': it.year == data['dt'].year,
+                    'month': it.year == data['dt'].year and it.month == data['dt'].month,
+                    'day': it.year == data['dt'].year and it.month == data['dt'].month and it.day == data['dt'].day,
+                    'hour': it.year == data['dt'].year and it.month == data['dt'].month and it.day == data[
+                        'dt'].day and it.hour == data['dt'].hour,
+                }
+                if options[group]:
+                    raw_data[it] += int(data['value'])
+    client.close()
+
+    return raw_data
+
 
 if __name__ == '__main__':
     with open('parametrs.json') as parametrs_file: #чтение файла параметров запуска
@@ -61,12 +96,7 @@ if __name__ == '__main__':
     if parametrs['create_database']: #если необходимо то создать базу данных и скопировать туда данные из дампа
         mongodb_crete(parametrs['database_name'], parametrs['collection_name'], parametrs['path_to_dump_database'])
 
-    with open('request.json', 'r') as request_json: #временная затычка для запросов
-        request = json.load(request_json)
-        request['dt_from'] = datetime.strptime(request['dt_from'], '%Y-%m-%dT%H:%M:%S')
-        request['dt_upto'] = datetime.strptime(request['dt_upto'], '%Y-%m-%dT%H:%M:%S')
-    request_json.close()
-    raw_data = dict_to_fill(request)
+    test = response(parametrs['database_name'], parametrs['collection_name'])
 
 
     print("start")
