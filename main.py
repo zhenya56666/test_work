@@ -1,6 +1,8 @@
 import json
 import pymongo
 import bson
+import telebot
+import asyncio
 from datetime import datetime, timedelta
 
 
@@ -53,12 +55,7 @@ def dict_to_fill(request): #функция создает словарь кот�
 
     return result
 
-def response(database_name, collection_name): #функция формирования ответа
-    with open('request.json', 'r') as request_json: #временная затычка для запросов
-        request = json.load(request_json)
-        request['dt_from'] = datetime.strptime(request['dt_from'], '%Y-%m-%dT%H:%M:%S')
-        request['dt_upto'] = datetime.strptime(request['dt_upto'], '%Y-%m-%dT%H:%M:%S')
-    request_json.close()
+def response(request, database_name, collection_name): #функция формирования ответа
     raw_data = dict_to_fill(request)
 
     client = pymongo.MongoClient("mongodb://localhost:27017/")  # подключение к mongodb
@@ -68,7 +65,7 @@ def response(database_name, collection_name): #функция формирова
     date_from = request['dt_from']
     date_to = request['dt_upto']
     group = request['group_type']
-    request_tobd = {"dt": {"$gte": date_from, "$lte": date_to}}
+    request_tobd = {"dt": {"$gte": date_from, "$lte": date_to}} #запрос к mongodb
     cursor_bd = collection.find(request_tobd)
 
     # заполняем данные
@@ -98,6 +95,9 @@ def response(database_name, collection_name): #функция формирова
 
     return result
 
+async def start_bot():
+    # Запуск бота в асинхронном режиме
+    bot.polling(none_stop=True)
 
 if __name__ == '__main__':
     with open('parametrs.json') as parametrs_file: #чтение файла параметров запуска
@@ -106,7 +106,22 @@ if __name__ == '__main__':
     if parametrs['create_database']: #если необходимо то создать базу данных и скопировать туда данные из дампа
         mongodb_crete(parametrs['database_name'], parametrs['collection_name'], parametrs['path_to_dump_database'])
 
-    test = response(parametrs['database_name'], parametrs['collection_name'])
+    bot = telebot.TeleBot(parametrs['Telegram_Bot_Api_Key'])
+    @bot.message_handler(commands=['start']) #вывод приветсвенного сообщения
+    def start_message_bot(message):
+        bot.send_message(message.chat.id, 'Привет! отправь мне сообщение в следующем формате: \n{\n"dt_from":"2022-9-01T00:00:00",\n"dt_upto":"2022-12-31T23:59:00",\n"group_type":"month"\n}')
 
+    @bot.message_handler(content_types=['text']) #функция обработки запроса с проверкой корректности запроса
+    def response_bot(message):
+        try:
+            request = json.loads(message.text)
+            request['dt_from'] = datetime.strptime(request['dt_from'], '%Y-%m-%dT%H:%M:%S')
+            request['dt_upto'] = datetime.strptime(request['dt_upto'], '%Y-%m-%dT%H:%M:%S')
+            mes = json.dumps(response(request, parametrs['database_name'], parametrs['collection_name']))
+            bot.send_message(message.chat.id, mes)
+        except:
+            bot.send_message(message.chat.id, 'Не верный запрос!')
 
-    print("start")
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot())
+    loop.run_forever()

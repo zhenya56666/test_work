@@ -2,5 +2,7 @@
   "create_database": false,
   "path_to_dump_database": "/home/shalti/PycharmProjects/test_work/sampleDB/sample_collection.bson",
   "database_name": "mydatabase",
-  "collection_name": "mycollection"
+  "collection_name": "mycollection",
+
+  "Telegram_Bot_Api_Key": "00000000000000000000000"
 }
